@@ -1,7 +1,7 @@
 
 # 🌟Radio Imaging Audio Generator
 
-[![tests](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml/badge.svg?branch=fork-improvements)](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml)
+[![tests](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml)
 
 > **This is a fork.** The original app is [Radio Imaging Audio Generator](https://github.com/bilsimaging/Radio-Imaging-Audio-Generator) by **Bilel Aroua** ([Bilsimaging](https://bilsimaging.com)), MIT License. The idea, the app and its design are his. This fork keeps the app working after OpenAI's GPT-3.5 shutdown, adds a free mode, a real progress bar, clip length control and broadcast-ready audio, fixes speed problems, runs a free GPU demo, and measures every result. See [What this fork changes](#what-this-fork-changes).
 >
