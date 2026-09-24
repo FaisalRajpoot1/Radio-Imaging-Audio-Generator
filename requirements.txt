@@ -1,5 +1,7 @@
 streamlit==1.28.2
 transformers==4.35.0
 scipy==1.11.3
-openai==0.28.0
+openai==3.19.2
 torch==2.1.1
+pyloudnorm==0.2.0
+lameenc==1.8.4
