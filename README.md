@@ -1,7 +1,9 @@
 
 # 🌟Radio Imaging Audio Generator
 
-> **This is a fork.** The original app is [Radio Imaging Audio Generator](https://github.com/bilsimaging/Radio-Imaging-Audio-Generator) by **Bilel Aroua** ([Bilsimaging](https://bilsimaging.com)), MIT License. The idea, the app and its design are his. This fork fixes speed and reliability problems and measures the result. See [What this fork changes](#what-this-fork-changes).
+[![tests](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml/badge.svg?branch=fork-improvements)](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml)
+
+> **This is a fork.** The original app is [Radio Imaging Audio Generator](https://github.com/bilsimaging/Radio-Imaging-Audio-Generator) by **Bilel Aroua** ([Bilsimaging](https://bilsimaging.com)), MIT License. The idea, the app and its design are his. This fork keeps the app working after OpenAI's GPT-3.5 shutdown, adds a free mode, a real progress bar, clip length control and broadcast-ready audio, fixes speed problems, and measures every result. See [What this fork changes](#what-this-fork-changes).
 
 ## 📜Description
 The Radio Imaging Audio Generator is a Streamlit-based application designed for radio producers and music creators. It combines OpenAI's GPT models with Facebook's MusicGen technology, enabling the generation of unique audio pieces from user-provided prompts.
@@ -18,7 +20,11 @@ This app is the next step in our project, following the Custom GPT Radio Imaging
 
 ## What this fork changes
 
-The app works the same for users. This fork fixes five problems in how it makes audio, and measures the result.
+Two rounds of work, each one measured.
+
+### Round 1: speed and reliability
+
+The app works the same for users. This round fixes five problems in how it makes audio.
 
 | Problem in the original | Fix in this fork |
 |---|---|
@@ -28,7 +34,7 @@ The app works the same for users. This fork fixes five problems in how it makes 
 | Every user's audio was written to one fixed WAV file on the server. | The audio stays in memory, one copy per user. Added a **Download Audio** button. |
 | The copyright notice was sent to MusicGen as part of the music prompt. | MusicGen gets only GPT's description. The notice is still shown and saved with the prompt. |
 
-### Measured results
+#### Measured results (round 1)
 
 | Measure | Original | This fork | Change |
 |---|---|---|---|
@@ -47,21 +53,65 @@ How to read this:
 
 How it was measured: Intel Core i7-8665U laptop (4 cores), 16 GB RAM, no GPU, Windows 11, Python 3.11. The original ran with its own `requirements.txt` (with TensorFlow). The fork ran in a clean install from the new `requirements.txt`. Both used the same prompt, with the model already on disk and the network off. Runs alternated between the two versions: 3 runs of 3 clicks for the original, 2 for the fork. Memory is the process's resident memory (RSS). Script: `benchmarks/bench_click_latency.py`.
 
+### Round 2: new features
+
+| What was missing or broken | What this fork adds |
+|---|---|
+| The GPT step used `gpt-3.5-turbo-16k` (shut down on 13 Sep 2024) and `gpt-3.5-turbo` (shuts down on 23 Oct 2026), through the old OpenAI library (0.28). | The current OpenAI library and models (default `gpt-6-luna`), an "Other…" field for future models, and a clear message if a model is retired. |
+| A paid OpenAI key was needed before any audio could be made. | **Free mode**: write the description yourself, or use the new **prompt builder** (genre, mood, instruments, tempo). |
+| No progress bar after round 1 (the old one was fake). | A **real progress bar** that follows MusicGen's generation steps, with the time left. |
+| Every clip was about 10 s long, and every take was random. | **Clip length** from 3 to 30 s, and a **seed** shown after every take, so a good take can be made again. |
+| Clip loudness varied a lot between prompts, and only WAV was offered. | **Broadcast-ready audio**: loudness set to EBU R128 (-23 LUFS) or online (-16 LUFS) with a look-ahead peak limiter, so no sample goes above -1 dBFS; fades; WAV and MP3 downloads. |
+
+The audio logic now lives in a small `radio_imaging/` package (model, progress, audio, prompts), so other interfaces can reuse it.
+
+#### Measured results (round 2)
+
+Wait per click by clip length (median of the clicks after the first, which also loads the model):
+
+| Clip length | Wait per click | Work per second of audio |
+|---|---|---|
+| 5 s | 46.9 s | 9.4 s |
+| 10 s | 96.7 s | 9.7 s |
+| 20 s | 226.0 s | 11.3 s |
+
+Loudness of 8 real clips from 8 different prompts (5 s each, fixed seeds):
+
+| | Peak cap only (first try) | With the peak limiter |
+|---|---|---|
+| Raw loudness before processing | -28.7 to -16.5 LUFS (a 12.1 LU spread) | same clips |
+| Worst miss at -23 LUFS | 0.48 LU | 0.00 LU |
+| Worst miss at -16 LUFS | 7.48 LU (6 of 8 clips fell short) | 0.49 LU |
+| Highest sample | -1.00 dBFS | -1.00 dBFS |
+
+How to read this:
+- A 5 s station ID is ready in about half the time of a 10 s clip.
+- My first version only lowered the gain when peaks were too high, so peaky clips could not reach -16 LUFS. The measurement caught it, and the look-ahead limiter fixed it.
+- Checked on the real model: the progress bar gets exactly one update per generation step (153 steps for a 3 s clip, 253 for 5 s). A 10 s clip is now exactly 10.00 s (503 tokens); the original's 512 tokens gave 10.18 s.
+
+How it was measured: the same laptop, the round-2 app in a clean install, the model on disk and the network off. Scripts: `benchmarks/bench_click_latency.py --seconds N` and `benchmarks/bench_loudness.py`.
+
 ### Tests
 
-`tests/` has 7 tests. They run the real app script with Streamlit's AppTest. Only the slow or outside parts are faked: loading the model and the OpenAI call. So they need no API key and no model download, and they run in about 7 seconds.
+`tests/` has 38 fast tests and 2 real-model tests:
+- **18 core tests** for `radio_imaging/`: clip length, seed, progress, loudness, limiter, fades, WAV, MP3, the prompt builder and the GPT step.
+- **20 app tests**: they run the real Streamlit script with Streamlit's AppTest.
+- Only the slow or outside parts are faked: loading the model and the OpenAI client. So these tests need no API key and no model download, and they run in about 20 seconds. GitHub Actions runs them on every push.
+- **2 real-model tests** prove that the fakes behave like the real MusicGen. They are skipped unless `RUN_REAL_MODEL=1` is set.
 
-Each test was written first and seen failing on the original code: 6 failed, and the 7th, which checks that the original copyright notice is still shown, passed on both.
+Each feature test was written first and seen failing before the code existed.
 
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest tests -q
+RUN_REAL_MODEL=1 python -m pytest tests/test_real_model.py   # downloads the 2.4 GB model
 ```
 
-To run the benchmark (the first run downloads the 2.4 GB model):
+To run the benchmarks (the first run downloads the 2.4 GB model):
 
 ```bash
-python benchmarks/bench_click_latency.py radio_imaging_app.py --clicks 3
+python benchmarks/bench_click_latency.py radio_imaging_app.py --clicks 3 --seconds 10
+python benchmarks/bench_loudness.py --seconds 5
 ```
 
 
@@ -74,11 +124,8 @@ python benchmarks/bench_click_latency.py radio_imaging_app.py --clicks 3
 
 ### Requirements
 - Python 3.11 (the pinned `torch==2.1.1` has no builds for Python 3.12 or newer)
-- Streamlit
-- Transformers
-- SciPy
-- PyTorch
-- OpenAI API key
+- Streamlit, Transformers, PyTorch, SciPy, pyloudnorm, lameenc and openai (see `requirements.txt`)
+- An OpenAI API key is optional: it is only needed for the GPT step
 
 ### Setup
 1. Clone the repository.
@@ -87,38 +134,15 @@ python benchmarks/bench_click_latency.py radio_imaging_app.py --clicks 3
 
 ## Usage
 1. Launch the Streamlit app.
-2. Enter your OpenAI API key.
-3. Select an OpenAI chat model.
-4. Input a description for the audio piece.
-5. Click 'Generate Audio'.
-6. Listen and download the audio directly in the app.
+2. Describe your audio: write it yourself, or use the prompt builder.
+3. (Optional) Add an OpenAI API key in the sidebar and click 'Generate Prompt' for a richer description.
+4. Choose the clip length, a seed (0 = random) and the loudness.
+5. Click 'Generate Audio' and watch the progress bar.
+6. Listen, then download WAV or MP3.
 
 ### 🌐 Access the Application
-Experience the Radio Imaging Audio Generator now: Access the Streamlit App here.
+The original app by Bilsimaging (without this fork's changes) runs here:
 https://radio-imaging-audio-generator.streamlit.app/
-
-### How to Use This Web App?
-To get started with creating your unique audio pieces, follow these simple steps:
- **1. Enter OpenAI API Key**
- - In the sidebar, input your **OpenAI API key**. This is essential to access the GPT model for 
-generating audio descriptions.
- - Don't have an API key? Get one for free [here](https://platform.openai.com/account/apikeys).
- **2. Select GPT Model**
- - Choose the desired GPT model from the dropdown in the sidebar. We recommend using 
-**'gpt-3.5-turbo-16k'** for more detailed and rich descriptions.
- **3. Input Your Detailed Description**
- - Describe your audio idea in the text area provided. Be as detailed as possible to guide the AI 
-effectively. This could include the mood, style, specific instruments, or any other relevant details.
- **4. Generate and Review the Prompt**
- - Click on **' Generate Prompt'** to create a descriptive prompt for your audio. Review it to 
-ensure it aligns with your vision.
- **5. Generate Your Audio**
- - If you're satisfied with the prompt, hit **'▶ Generate Audio'**. This will process your request 
-and create the audio piece based on the AI-generated description.
- **6. Playback and Download**
- - Once generated, you can play the audio directly within the app. If it meets your needs, feel 
-free to download and use it in your projects.
-
 
 ### 💖 Support
 To support further development, consider donating at [Ko-fi](https://ko-fi.com/bilsimaging).
