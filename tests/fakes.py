@@ -1,10 +1,14 @@
 """Test doubles shared by the test files.
 
 FakeMusicgen mirrors the real MusicgenForConditionalGeneration: generate() gets
-the processor's tensors, max_new_tokens and an optional streamer. Like
-transformers' generate + sample(), it calls streamer.put() once with the prompt
-ids, once per generated step, then streamer.end(), and it samples with torch's
-random generator. It returns [batch, channels, samples] like the real model.
+the processor's tensors, max_new_tokens, and optional stopping criteria and
+streamer. Like transformers' generate + sample(), it calls the stopping
+criteria once per generated step, and it samples with torch's random
+generator. Like transformers 5.x, it hands the streamer only the prompt ids:
+5.x's MusicGen generate() no longer passes the streamer to its step loop.
+With skips_last_step_report=True it behaves like transformers 4.x, whose any()
+skips custom stopping criteria on the final step, once max length is reached.
+It returns [batch, channels, samples] like the real model.
 
 FakeOpenAI stands in for openai.OpenAI (an outside, paid service). Its replies
 are the openai library's real ChatCompletion objects.
@@ -42,17 +46,27 @@ class FakeMusicgen:
         decoder=SimpleNamespace(num_codebooks=CODEBOOKS),
     )
 
-    def __init__(self):
-        self.got_streamer = False
+    def __init__(self, device=torch.device("cpu"), skips_last_step_report=False):
+        self.device = device
+        self.skips_last_step_report = skips_last_step_report
+        self.moved_to = []
+        self.got_progress_hook = False
+        self.input_device = None
 
-    def generate(self, input_ids, attention_mask, max_new_tokens, streamer=None):
+    def to(self, device):
+        self.moved_to.append(str(device))
+        return self
+
+    def generate(self, input_ids, attention_mask, max_new_tokens, stopping_criteria=None, streamer=None):
+        self.input_device = input_ids.device
         rows = input_ids.shape[0]
         if streamer is not None:
-            self.got_streamer = True
-            streamer.put(torch.zeros((rows * CODEBOOKS, 1), dtype=torch.long))  # prompt ids
-            for _ in range(max_new_tokens):
-                streamer.put(torch.zeros((rows * CODEBOOKS,), dtype=torch.long))
-            streamer.end()
+            streamer.put(torch.zeros((rows * CODEBOOKS, 1), dtype=torch.long))  # prompt ids only
+        if stopping_criteria is not None:
+            self.got_progress_hook = True
+            ids = torch.zeros((rows * CODEBOOKS, 1), dtype=torch.long)
+            for _ in range(max_new_tokens - 1 if self.skips_last_step_report else max_new_tokens):
+                stopping_criteria(ids, None)
         frames = max_new_tokens - (CODEBOOKS - 1)
         return (torch.rand(rows, 1, frames * SAMPLES_PER_FRAME) * 2 - 1) * 0.3
 

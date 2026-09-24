@@ -286,7 +286,7 @@ def test_progress_bar_follows_real_generation_and_finishes(musicgen):
 
     generate_audio(at, "Station ID with a rising whoosh")
 
-    assert musicgen.model.got_streamer
+    assert musicgen.model.got_progress_hook
     [bar] = at.get("progress")
     assert bar.proto.value == 100
     assert bar.proto.text.startswith("Done")

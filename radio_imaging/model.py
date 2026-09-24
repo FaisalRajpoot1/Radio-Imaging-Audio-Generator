@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoProcessor, MusicgenForConditionalGeneration
+from transformers import AutoProcessor, MusicgenForConditionalGeneration, StoppingCriteriaList
 
 from radio_imaging.progress import StepProgress
 
@@ -33,8 +33,13 @@ def generate(processor, musicgen_model, text, seconds=10, seed=None, on_step=Non
     if seed is not None:
         torch.manual_seed(seed)
     inputs = processor(text=[text] * variations, padding=True, return_tensors="pt")
+    # The model may sit on a GPU; its inputs must be on the same device.
+    inputs = {name: tensor.to(musicgen_model.device) for name, tensor in inputs.items()}
     max_new_tokens = tokens_for(seconds, musicgen_model)
-    streamer = StepProgress(max_new_tokens, on_step) if on_step else None
-    audio_values = musicgen_model.generate(**inputs, max_new_tokens=max_new_tokens, streamer=streamer)
+    progress = StepProgress(max_new_tokens, on_step) if on_step else None
+    audio_values = musicgen_model.generate(**inputs, max_new_tokens=max_new_tokens,
+                                           stopping_criteria=StoppingCriteriaList([progress]) if progress else None)
+    if progress:
+        progress.finish()
     sampling_rate = musicgen_model.config.audio_encoder.sampling_rate
-    return sampling_rate, [audio_values[i, 0].numpy() for i in range(variations)]
+    return sampling_rate, [audio_values[i, 0].cpu().numpy() for i in range(variations)]

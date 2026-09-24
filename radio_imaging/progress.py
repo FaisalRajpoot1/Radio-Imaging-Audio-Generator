@@ -1,25 +1,34 @@
-from transformers.generation.streamers import BaseStreamer
+from transformers import StoppingCriteria
 
 
-class StepProgress(BaseStreamer):
-    """Calls on_step(done, total) once per MusicGen generation step.
+class StepProgress(StoppingCriteria):
+    """Calls on_step(done, total) once per MusicGen generation step. It never
+    stops generation.
 
-    generate() first passes the prompt ids to put(), then one put() per new
-    step, then end(). Only the new steps are counted.
+    It is a stopping criterion, not a streamer: transformers calls stopping
+    criteria at every step, but MusicGen's generate() in transformers 5.x no
+    longer passes its streamer to the step loop.
     """
 
     def __init__(self, total_steps, on_step):
         self.total_steps = total_steps
         self.on_step = on_step
         self.done = 0
-        self._prompt_seen = False
 
-    def put(self, value):
-        if not self._prompt_seen:
-            self._prompt_seen = True
-            return
-        self.done += 1
-        self.on_step(self.done, self.total_steps)
+    def __call__(self, input_ids, scores, **kwargs):
+        # On a GPU, transformers 5.x may run one step more and undo it later.
+        if self.done < self.total_steps:
+            self.done += 1
+            self.on_step(self.done, self.total_steps)
+        # A plain False works with both old (any()) and new (tensor |) transformers.
+        return False
 
-    def end(self):
-        pass
+    def finish(self):
+        """Report the last step if generation ended without reporting it.
+
+        transformers 4.x checks stopping criteria with any(), which skips this
+        one on the final step, once the max length criterion is met.
+        """
+        if self.done < self.total_steps:
+            self.done = self.total_steps
+            self.on_step(self.done, self.total_steps)

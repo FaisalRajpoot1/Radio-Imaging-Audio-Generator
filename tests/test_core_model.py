@@ -56,6 +56,48 @@ def test_same_seed_gives_the_same_audio():
     assert not np.array_equal(first, other)
 
 
+def test_generate_sends_inputs_to_the_models_device():
+    # Break caught: CPU tensors reaching a GPU model, which crashes on the
+    # Hugging Face GPU Space. The "meta" device stands in for a GPU here.
+    import torch
+
+    from radio_imaging.model import generate
+
+    model = FakeMusicgen(device=torch.device("meta"))
+
+    rate, [clip] = generate(FakeProcessor(), model, "x", seconds=3)
+
+    assert model.input_device == torch.device("meta")
+    assert clip.shape == (96_000,)
+
+
+def test_progress_still_finishes_when_the_last_step_is_not_reported():
+    # Break caught: a progress bar stuck one step short on transformers 4.x,
+    # whose any() skips custom stopping criteria on the final step.
+    from radio_imaging.model import generate
+
+    seen = []
+    generate(FakeProcessor(), FakeMusicgen(skips_last_step_report=True), "x", seconds=3,
+             on_step=lambda done, total: seen.append((done, total)))
+
+    assert seen == [(step, 153) for step in range(1, 154)]
+
+
+def test_progress_never_goes_past_100_percent():
+    # Break caught: reporting more steps than exist. On a GPU, transformers 5.x
+    # may run one extra step and undo it later, and a value over 100% crashes
+    # Streamlit's progress bar.
+    from radio_imaging.progress import StepProgress
+
+    seen = []
+    progress = StepProgress(3, lambda done, total: seen.append((done, total)))
+
+    for _ in range(4):
+        progress(None, None)
+
+    assert seen == [(1, 3), (2, 3), (3, 3)]
+
+
 def test_progress_reports_each_generation_step_once():
     # Break caught: counting the prompt as a step (off by one), skipping steps,
     # or reporting "done" twice.
