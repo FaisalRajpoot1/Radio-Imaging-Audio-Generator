@@ -1,10 +1,22 @@
+import io
 import streamlit as st
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
 import scipy.io.wavfile
 import openai
-import time  # Used for simulating progress
 import torch
-import tensorflow as tf
+
+
+# Copyright notice shown to people with every prompt. It is not sent to MusicGen.
+copyright_notice = "\n\n© Created through Radio Imaging Audio Generator by Bilsimaging [WEBSITE](https://bilsimaging.com)"
+
+
+# Load MusicGen once per server process. Every click, from every user, reuses it
+# instead of reloading 2.4 GB of weights.
+@st.cache_resource(show_spinner="Loading the MusicGen model (first run only)...")
+def load_musicgen():
+    processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
+    musicgen_model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
+    return processor, musicgen_model
 
 
 # Streamlit app setup
@@ -86,18 +98,16 @@ if st.button("📄 Generate Prompt"):
                 response = openai.ChatCompletion.create(model=model, messages=[full_prompt], api_key=openai_api_key)
                 descriptive_text = response.choices[0].message['content'].strip()
 
-                # Append a copyright notice or tag
-                copyright_notice = "\n\n© Created through Radio Imaging Audio Generator by Bilsimaging [WEBSITE](https://bilsimaging.com)"
-                descriptive_text += copyright_notice
-
+                # MusicGen gets only GPT's description; the copyright notice is for people
                 st.session_state['generated_prompt'] = descriptive_text
+                prompt_with_notice = descriptive_text + copyright_notice
                 st.success("Your prompt has been successfully generated! Review the prompt below:")
-                st.write(descriptive_text)
+                st.write(prompt_with_notice)
 
                 # Download Button for the generated prompt
                 st.download_button(
                     label="Download Prompt",
-                    data=descriptive_text,
+                    data=prompt_with_notice,
                     file_name="generated_prompt.txt",
                     mime="text/plain"
                 )
@@ -109,7 +119,7 @@ st.markdown("---")
 
 
 
-# Generate Audio Button with Progress Bar and Load Management
+# Generate Audio Button with Load Management
 st.markdown("## 🎶 Generate Audio")
 st.info("🚨 Please be patient as generating audio can take some time. This might take a moment due to resource limits. Feel free to notify me if you encounter any issues.")   
 
@@ -124,27 +134,27 @@ if st.button("▶ Generate Audio"):
 
         if server_ready_for_audio_generation:
             with st.spinner("Generating your audio... Please wait, this might take a few moments."):
-                progress_bar = st.progress(0)
-                for i in range(100):
-                    time.sleep(0.1)  # Simulate processing
-                    progress_bar.progress(i + 1)
-                
                 try:
-                    processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
-                    musicgen_model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
+                    processor, musicgen_model = load_musicgen()
                     inputs = processor(text=[descriptive_text], padding=True, return_tensors="pt")
                     audio_values = musicgen_model.generate(**inputs, max_new_tokens=512)
                     sampling_rate = musicgen_model.config.audio_encoder.sampling_rate
 
-                    audio_filename = "Bilsimaging_radio_imaging_output.wav"
-                    scipy.io.wavfile.write(audio_filename, rate=sampling_rate, data=audio_values[0, 0].numpy())
+                    # Keep the WAV in memory, so each user gets their own clip and nothing is left on the server
+                    wav_buffer = io.BytesIO()
+                    scipy.io.wavfile.write(wav_buffer, rate=sampling_rate, data=audio_values[0, 0].numpy())
+                    wav_bytes = wav_buffer.getvalue()
                     st.success("Your audio has been successfully created! Below is a description of your audio piece based on the GPT model's understanding:")
-                    st.write(descriptive_text)
-                    st.audio(audio_filename)
+                    st.write(descriptive_text + copyright_notice)
+                    st.audio(wav_bytes, format="audio/wav")
+                    st.download_button(
+                        label="Download Audio",
+                        data=wav_bytes,
+                        file_name="Bilsimaging_radio_imaging_output.wav",
+                        mime="audio/wav"
+                    )
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
-                finally:
-                    progress_bar.empty()  # Remove the progress bar after completion
         else:
             st.warning("The server is currently busy. Please try generating your audio again later.")
 
