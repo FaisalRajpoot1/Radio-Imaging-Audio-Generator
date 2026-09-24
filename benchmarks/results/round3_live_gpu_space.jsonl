@@ -1,0 +1,10 @@
+{"seconds": 10, "takes": 1, "seed": 1, "generated_s": 14.9, "round_trip_s": 20.0, "wav_lengths_s": [10.0], "mp3_kb": [241], "players_are_mp3": true, "players_used": 1}
+{"seconds": 10, "takes": 1, "seed": 2, "generated_s": 19.7, "round_trip_s": 21.2, "wav_lengths_s": [10.0], "mp3_kb": [241], "players_are_mp3": true, "players_used": 1}
+{"seconds": 10, "takes": 1, "seed": 3, "generated_s": 28.9, "round_trip_s": 30.5, "wav_lengths_s": [10.0], "mp3_kb": [241], "players_are_mp3": true, "players_used": 1}
+{"seconds": 10, "takes": 1, "seed": 4, "generated_s": 11.7, "round_trip_s": 13.1, "wav_lengths_s": [10.0], "mp3_kb": [241], "players_are_mp3": true, "players_used": 1}
+{"seconds": 10, "takes": 1, "seed": 5, "generated_s": 8.6, "round_trip_s": 10.0, "wav_lengths_s": [10.0], "mp3_kb": [241], "players_are_mp3": true, "players_used": 1}
+{"seconds": 10, "takes": 1, "seed": 6, "generated_s": 10.4, "round_trip_s": 11.8, "wav_lengths_s": [10.0], "mp3_kb": [241], "players_are_mp3": true, "players_used": 1}
+{"seconds": 10, "takes": 3, "seed": 7, "generated_s": 6.9, "round_trip_s": 8.7, "wav_lengths_s": [10.0, 10.0, 10.0], "mp3_kb": [241, 241, 241], "players_are_mp3": true, "players_used": 3}
+{"seconds": 30, "takes": 1, "seed": 8, "generated_s": 18.3, "round_trip_s": 19.9, "wav_lengths_s": [30.0], "mp3_kb": [721], "players_are_mp3": true, "players_used": 1}
+{"downloaded_take": {"clip_s": 10.0, "lufs": -23.0}}
+{"summary": {"warm_up_generated_s": 14.9, "ten_s_clip_generated_median_s": 11.7, "ten_s_clip_generated_all_s": [19.7, 28.9, 11.7, 8.6, 10.4], "ten_s_clip_round_trip_median_s": 13.1, "three_takes_generated_s": 6.9, "thirty_s_clip_generated_s": 18.3}}
