@@ -3,7 +3,9 @@
 
 [![tests](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml/badge.svg?branch=fork-improvements)](https://github.com/FaisalRajpoot1/Radio-Imaging-Audio-Generator/actions/workflows/tests.yml)
 
-> **This is a fork.** The original app is [Radio Imaging Audio Generator](https://github.com/bilsimaging/Radio-Imaging-Audio-Generator) by **Bilel Aroua** ([Bilsimaging](https://bilsimaging.com)), MIT License. The idea, the app and its design are his. This fork keeps the app working after OpenAI's GPT-3.5 shutdown, adds a free mode, a real progress bar, clip length control and broadcast-ready audio, fixes speed problems, and measures every result. See [What this fork changes](#what-this-fork-changes).
+> **This is a fork.** The original app is [Radio Imaging Audio Generator](https://github.com/bilsimaging/Radio-Imaging-Audio-Generator) by **Bilel Aroua** ([Bilsimaging](https://bilsimaging.com)), MIT License. The idea, the app and its design are his. This fork keeps the app working after OpenAI's GPT-3.5 shutdown, adds a free mode, a real progress bar, clip length control and broadcast-ready audio, fixes speed problems, runs a free GPU demo, and measures every result. See [What this fork changes](#what-this-fork-changes).
+>
+> **Try it live on a free GPU:** [huggingface.co/spaces/Faisal87/radio-imaging-audio-generator](https://huggingface.co/spaces/Faisal87/radio-imaging-audio-generator)
 
 ## 📜Description
 The Radio Imaging Audio Generator is a Streamlit-based application designed for radio producers and music creators. It combines OpenAI's GPT models with Facebook's MusicGen technology, enabling the generation of unique audio pieces from user-provided prompts.
@@ -91,12 +93,35 @@ How to read this:
 
 How it was measured: the same laptop, the round-2 app in a clean install, the model on disk and the network off. Scripts: `benchmarks/bench_click_latency.py --seconds N` and `benchmarks/bench_loudness.py`.
 
+### Round 3: a free GPU demo
+
+**Live:** [huggingface.co/spaces/Faisal87/radio-imaging-audio-generator](https://huggingface.co/spaces/Faisal87/radio-imaging-audio-generator)
+
+A second interface, `space/app.py`, runs on Hugging Face's free ZeroGPU hardware. It is built with Gradio and reuses the same `radio_imaging/` package. It adds up to **3 takes per click**, and it offers the same free mode, prompt builder, optional GPT step, loudness targets and WAV/MP3 downloads. Only the model call uses the GPU; loudness and encoding run on the CPU, so they use no GPU quota. `space/deploy.py` uploads it.
+
+#### Measured results (round 3)
+
+| Request | Laptop CPU (Streamlit app) | Free GPU Space |
+|---|---|---|
+| One 10 s clip (median) | 96.7 s | **11.7 s** (5 runs: 8.6 to 28.9 s) |
+| Three 10 s takes in one click | — | 6.9 s (1 run) |
+| One 30 s clip | — | 18.3 s (1 run) |
+
+How to read this:
+- The Space times include waiting for ZeroGPU to hand out a shared GPU, which varies with demand. The first call after a restart took 14.9 s.
+- Every result was checked: the clips were exactly 10.00 s and 30.00 s long, and a downloaded take measured -23.00 LUFS.
+
+What this round found:
+- **The progress bar never moved with transformers 5.x.** The Space needs transformers 5 (PyTorch 2.8+). Real-model tests there showed that MusicGen's `generate()` no longer passes its streamer to the step loop. Progress now comes from a stopping criterion that never stops, which transformers calls at every step. transformers 4.x skips it on the final step, so the last step is reported afterwards. Real-model tests pass on both 4.35 and 5.17.
+- **Slow downloads from the Space's servers.** From my test laptop, some downloads crawled at about 12 KB/s: a 640 KB player file took about 50 s. Gradio's own page files crawled too, and the main Hugging Face site stayed fast, so the cause is the network route, not the app. The players now load the take's MP3 (241 KB for 10 s), 62% less data than the WAV they loaded before.
+
 ### Tests
 
-`tests/` has 38 fast tests and 2 real-model tests:
-- **18 core tests** for `radio_imaging/`: clip length, seed, progress, loudness, limiter, fades, WAV, MP3, the prompt builder and the GPT step.
+`tests/` has 41 fast tests for the Streamlit setup, 13 for the Space app, and 2 real-model tests:
+- **21 core tests** for `radio_imaging/`: clip length, seed, progress (on both transformers versions), the model's device, loudness, limiter, fades, WAV, MP3, the prompt builder and the GPT step.
 - **20 app tests**: they run the real Streamlit script with Streamlit's AppTest.
-- Only the slow or outside parts are faked: loading the model and the OpenAI client. So these tests need no API key and no model download, and they run in about 20 seconds. GitHub Actions runs them on every push.
+- **13 Space app tests** for `space/app.py`: GPU placement, takes, lengths, loudness, MP3 players, downloads, seed, errors and the GPT step. They run where Gradio is installed.
+- Only the slow or outside parts are faked: loading the model and the OpenAI client. So these tests need no API key and no model download. GitHub Actions runs them on every push in two jobs: the Streamlit setup (Python 3.11), and the Space's exact versions (Python 3.12, PyTorch 2.8, transformers 5.17, Gradio 6.28).
 - **2 real-model tests** prove that the fakes behave like the real MusicGen. They are skipped unless `RUN_REAL_MODEL=1` is set.
 
 Each feature test was written first and seen failing before the code existed.
@@ -141,6 +166,9 @@ python benchmarks/bench_loudness.py --seconds 5
 6. Listen, then download WAV or MP3.
 
 ### 🌐 Access the Application
+This fork's free GPU demo (Gradio on Hugging Face ZeroGPU):
+https://huggingface.co/spaces/Faisal87/radio-imaging-audio-generator
+
 The original app by Bilsimaging (without this fork's changes) runs here:
 https://radio-imaging-audio-generator.streamlit.app/
 
