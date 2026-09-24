@@ -14,9 +14,14 @@ render includes the cost of importing the app's libraries.
 import argparse
 import json
 import os
+import sys
 import tempfile
 import time
 from pathlib import Path
+
+# The app imports the radio_imaging package from the repo root, and this
+# script changes into a temporary folder, so put the root on the path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import psutil
 from streamlit.testing.v1 import AppTest
@@ -51,6 +56,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("app", help="path to the Streamlit script to measure")
     parser.add_argument("--clicks", type=int, default=3, help="Generate Audio clicks in one session")
+    parser.add_argument("--seconds", type=int, help="clip length; sets the length slider (versions that have one)")
     args = parser.parse_args()
     app = str(Path(args.app).resolve())
 
@@ -58,7 +64,7 @@ def main():
     os.chdir(tempfile.mkdtemp(prefix="radio-bench-"))
     wait_for_script_thread()
 
-    result = {"app": app, "rss_mb_before_render": rss_mb()}
+    result = {"app": app, "seconds": args.seconds, "rss_mb_before_render": rss_mb()}
 
     at = AppTest.from_file(app, default_timeout=1800)
     start = time.perf_counter()
@@ -66,6 +72,9 @@ def main():
     result["first_render_s"] = round(time.perf_counter() - start, 2)
     result["rss_mb_after_render"] = rss_mb()
     assert not at.exception, at.exception
+
+    if args.seconds:
+        at.slider(key="seconds").set_value(args.seconds)
 
     clicks = []
     for _ in range(args.clicks):
