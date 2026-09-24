@@ -1,0 +1,11 @@
+[12:52:43] original_r2: start
+[12:58:57] original_r2: exit 0
+[12:58:57] fixed_clean_r2: start
+[13:04:26] fixed_clean_r2: exit 0
+[13:04:26] original_r3: start
+[13:10:43] original_r3: exit 0
+[13:10:43] fixed_clean_r3: start
+[13:16:08] fixed_clean_r3: exit 0
+[13:16:08] warm model load timing (clean env)
+LOAD_TIMES_S [9.97, 11.3, 11.07]
+[13:16:44] ALL ROUNDS DONE

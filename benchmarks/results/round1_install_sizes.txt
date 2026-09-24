@@ -1,0 +1,23 @@
+[23:58:59] step 1: uv tool venv
+uv 0.12.18 (01cb90c1a 2026-09-22 x86_64-pc-windows-msvc)
+[00:03:04] step 2: python 3.11 + venv
+Python 3.11.16
+[00:05:00] SIZE empty_venv_bytes=10723
+[00:05:00] step 3: app packages WITHOUT tensorflow (original pins)
+[12:10:26] === run started (safe to re-run: finished steps are skipped) ===
+uv 0.12.18 (01cb90c1a 2026-09-22 x86_64-pc-windows-msvc)
+Python 3.11.16
+[12:10:26] step 3: app packages WITHOUT tensorflow (original pins)
+[12:15:33] SIZE without_tf_bytes=1508523320
+[12:15:33] step 4: add tensorflow==2.13.0 (original pin)
+[12:20:12] === run started (safe to re-run: finished steps are skipped) ===
+uv 0.12.18 (01cb90c1a 2026-09-22 x86_64-pc-windows-msvc)
+Python 3.11.16
+[12:20:12] step 3: app packages WITHOUT tensorflow (original pins)
+[12:20:15] SIZE without_tf_bytes=1508523320
+[12:20:15] step 4: add tensorflow==2.13.0 (original pin)
+[12:22:28] SIZE with_tf_bytes=2718850117
+[12:22:28] step 5: test and benchmark tools (not part of the app)
+[12:22:31] step 6: download facebook/musicgen-small into HF_HOME
+model download + first load: 405.7s
+[12:29:19] ALL DONE

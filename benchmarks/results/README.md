@@ -10,11 +10,11 @@ These files are the raw output behind every number in the main README. They were
 
 | File | What it holds | README table |
 |---|---|---|
-| `round1_install_sizes.log` | Size of `site-packages` without TensorFlow (1,508,523,320 bytes) and with it (2,718,850,117 bytes) | Install size |
+| `round1_install_sizes.txt` | Size of `site-packages` without TensorFlow (1,508,523,320 bytes) and with it (2,718,850,117 bytes) | Install size |
 | `round1_packages_without_tensorflow.txt`, `round1_packages_with_tensorflow.txt` | The installed packages, which show what TensorFlow added | Install size |
-| `round1_clicks_run1.log` | First click run: original app, and the fork **with TensorFlow still installed** (not used in the tables, see below) | — |
+| `round1_clicks_run1.txt` | First click run: original app, and the fork **with TensorFlow still installed** (not used in the tables, see below) | — |
 | `round1_clicks_runs2_3.jsonl` | Click runs 2 and 3: the original (with TensorFlow) against the fork (clean install), alternating | Wait per click, peak memory |
-| `round1_model_load_times.log` | Three timed model loads: 9.97, 11.3 and 11.07 s | "11 s model reload" |
+| `round1_model_load_times.txt` | Three timed model loads: 9.97, 11.3 and 11.07 s | "11 s model reload" |
 | `round1_first_page_load.jsonl` | Five first page loads of each version | First page load, memory after load |
 
 Run 1 of the fork is left out of the tables because TensorFlow was still installed, and `transformers` imports it at start-up. The fair comparison is the fork in a clean install, which runs 2 and 3 use. The original's run 1 is used, because it had its normal setup.

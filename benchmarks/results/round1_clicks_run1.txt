@@ -1,0 +1,3 @@
+[12:37:46] original: start
+[12:44:11] original: exit 0 -> {"app": "<scratch>\\original_radio_imaging_app.py", "rss_mb_before_render": 105, "first_render_s": 6.1, "rss_mb_after_render": 468, "click_s": [125.6, 126.43, 124.47], "rss_mb_after_clicks": 3661, "peak_mb": 6702}
+[12:49:07] fixed: exit 0 -> {"app": "<repo>\\radio_imaging_app.py", "rss_mb_before_render": 104, "first_render_s": 5.93, "rss_mb_after_render": 468, "click_s": [111.17, 100.63, 75.69], "rss_mb_after_clicks": 3371, "peak_mb": 5193}
