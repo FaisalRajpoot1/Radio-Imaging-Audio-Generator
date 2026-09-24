@@ -55,6 +55,15 @@ def fake_openai(monkeypatch):
     return FakeOpenAI
 
 
+def take_files(files):
+    """{take number: {".wav": path, ".mp3": path}} from the download list."""
+    takes = {}
+    for f in files:
+        number = int(Path(f).name.split("_take")[1].split("_")[0])  # radio_imaging_take1_seed7.wav
+        takes.setdefault(number, {})[Path(f).suffix] = f
+    return takes
+
+
 def test_model_goes_on_the_gpu_on_zerogpu(monkeypatch):
     # Break caught: loading the model on the CPU on ZeroGPU, which must place
     # models on cuda when the app starts.
@@ -74,8 +83,10 @@ def test_each_take_has_the_requested_length_and_loudness(space):
     # Break caught: takes at the wrong length, or skipping the loudness step.
     status, *players, files = space.app.create_audio("calm piano bed", 5, 0, 3, BROADCAST)
 
-    assert len(players) == 3
-    for rate, samples in players:
+    takes = take_files(files)
+    assert sorted(takes) == [1, 2, 3]
+    for number in (1, 2, 3):
+        rate, samples = scipy.io.wavfile.read(takes[number][".wav"])
         assert rate == 32_000
         assert samples.shape == (160_000,)
         assert pyloudnorm.Meter(rate).integrated_loudness(samples) == pytest.approx(-23.0, abs=0.1)
@@ -85,18 +96,24 @@ def test_every_take_can_be_downloaded_as_wav_and_mp3(space):
     # Break caught: missing or broken download files.
     status, *players, files = space.app.create_audio("news sting", 3, 0, 2, BROADCAST)
 
-    formats_per_take = {}
-    for f in files:
-        take = Path(f).name.split("_seed")[0]
-        formats_per_take.setdefault(take, set()).add(Path(f).suffix)
-    assert formats_per_take == {"radio_imaging_take1": {".wav", ".mp3"}, "radio_imaging_take2": {".wav", ".mp3"}}
-    wavs = [f for f in files if f.endswith(".wav")]
-    for wav, (rate, samples) in zip(sorted(wavs), players[:2]):
-        file_rate, file_samples = scipy.io.wavfile.read(wav)
-        assert file_rate == 32_000 and np.array_equal(file_samples, samples)
-    for mp3 in (f for f in files if f.endswith(".mp3")):
-        data = Path(mp3).read_bytes()
+    takes = take_files(files)
+    assert {number: set(formats) for number, formats in takes.items()} == {1: {".wav", ".mp3"}, 2: {".wav", ".mp3"}}
+    for formats in takes.values():
+        data = Path(formats[".mp3"]).read_bytes()
         assert data[0] == 0xFF and data[1] & 0xE0 == 0xE0   # MPEG audio frame sync
+
+
+def test_players_play_the_small_mp3(space):
+    # Break caught: players loading a big WAV. From some networks the Space's
+    # downloads crawl at about 12 KB/s, and the 192 kbit/s MP3 is 62% smaller
+    # than the 16-bit WAV a player would otherwise load. 10 s of MP3 at
+    # 192 kbit/s is about 192_000 / 8 * 10 = 240_000 bytes.
+    status, *players, files = space.app.create_audio("drive-time jingle", 10, 0, 2, BROADCAST)
+
+    takes = take_files(files)
+    assert players[:2] == [takes[1][".mp3"], takes[2][".mp3"]]
+    for player in players[:2]:
+        assert Path(player).stat().st_size == pytest.approx(240_000, rel=0.05)
 
 
 def test_fewer_takes_leave_the_other_players_empty(space):
@@ -112,10 +129,11 @@ def test_the_shown_seed_makes_the_same_takes_again(space):
     status, *players, files = space.app.create_audio("jazzy promo", 3, 0, 2, BROADCAST)
     seed = int(re.search(r"seed (\d+)", status).group(1))
 
-    again = space.app.create_audio("jazzy promo", 3, seed, 2, BROADCAST)[1:3]
+    again = space.app.create_audio("jazzy promo", 3, seed, 2, BROADCAST)[-1]
 
-    for (rate, first), (_, second) in zip(players[:2], again):
-        assert np.array_equal(first, second)
+    first, second = take_files(files), take_files(again)
+    for number in (1, 2):
+        assert Path(first[number][".wav"]).read_bytes() == Path(second[number][".wav"]).read_bytes()
 
 
 def test_empty_description_asks_for_one(space):

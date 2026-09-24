@@ -55,11 +55,13 @@ def create_audio(description, seconds, seed, takes, loudness):
     players, files = [], []
     for number, clip in enumerate(clips, start=1):
         finished = finish_clip(clip, rate, LOUDNESS_TARGETS[loudness])
-        players.append((rate, finished))
+        paths = {}
         for suffix, data in (("wav", to_wav_bytes(finished, rate)), ("mp3", to_mp3_bytes(finished, rate))):
-            path = folder / f"radio_imaging_take{number}_seed{take_seed}.{suffix}"
-            path.write_bytes(data)
-            files.append(str(path))
+            paths[suffix] = folder / f"radio_imaging_take{number}_seed{take_seed}.{suffix}"
+            paths[suffix].write_bytes(data)
+            files.append(str(paths[suffix]))
+        # The players load the MP3: 62% less data than a 16-bit WAV, which matters on slow routes.
+        players.append(str(paths["mp3"]))
     players += [None] * (MAX_TAKES - len(players))
 
     status = f"Done: {takes} take(s) of {seconds} s, generated in {elapsed:.1f} s (seed {take_seed})."
@@ -124,7 +126,7 @@ with gr.Blocks(title="Radio Imaging Audio Generator", delete_cache=(3600, 3600))
             generate_button = gr.Button("▶ Generate Audio", variant="primary")
         with gr.Column():
             status = gr.Markdown()
-            players = [gr.Audio(label=f"Take {number}", type="numpy", interactive=False)
+            players = [gr.Audio(label=f"Take {number}", type="filepath", interactive=False)
                        for number in range(1, MAX_TAKES + 1)]
             files = gr.File(label="Downloads: WAV and MP3", file_count="multiple")
 
