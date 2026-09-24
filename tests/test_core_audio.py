@@ -23,6 +23,15 @@ def loudness(samples):
     return pyloudnorm.Meter(RATE).integrated_loudness(samples)
 
 
+def peaky_clip(seconds=5):
+    """Quiet noise with short loud hits, like drums: high peaks, low average loudness."""
+    clip = noise(seconds, level=0.03)
+    hit = (0.8 * np.hanning(int(0.005 * RATE))).astype(np.float32)  # a 5 ms hit
+    for start in range(0, len(clip) - len(hit), RATE // 2):
+        clip[start:start + len(hit)] += hit
+    return clip
+
+
 @pytest.mark.parametrize("target", [-23.0, -16.0])
 def test_normalize_reaches_the_loudness_target(target):
     # Break caught: a wrong gain formula or meter setup, so clips miss the
@@ -46,6 +55,34 @@ def test_normalize_never_pushes_peaks_above_minus_1_dbfs():
 
     assert np.max(np.abs(out)) <= CEILING + 1e-6
     assert np.max(np.abs(out)) == pytest.approx(CEILING, rel=1e-4)
+
+
+def test_online_target_is_reached_on_a_peaky_clip_without_clipping():
+    # Break caught: stopping short of the target when peaks leave no headroom.
+    # This happened on 6 of 8 real MusicGen clips at -16 LUFS (up to 7.5 LU
+    # short). A peak limiter must lower only the peaks instead.
+    from radio_imaging.audio import normalize_loudness
+
+    out = normalize_loudness(peaky_clip(), RATE, -16.0)
+
+    assert loudness(out) == pytest.approx(-16.0, abs=0.2)
+    assert np.max(np.abs(out)) <= CEILING + 1e-6
+
+
+def test_limiter_changes_gain_smoothly():
+    # Break caught: hard clipping (cutting peaks off), which distorts. A
+    # limiter's gain may only change a little from one sample to the next.
+    from radio_imaging.audio import limit_peaks
+
+    clip = peaky_clip() * 4  # peaks far above the ceiling
+
+    out = limit_peaks(clip, RATE)
+
+    audible = np.abs(clip) > 1e-3
+    gain = np.divide(out, clip, out=np.ones_like(clip), where=audible)
+    both = audible[:-1] & audible[1:]
+    assert np.max(np.abs(np.diff(gain)[both])) <= 0.01
+    assert np.max(np.abs(out)) <= CEILING + 1e-6
 
 
 def test_normalize_leaves_silence_alone():

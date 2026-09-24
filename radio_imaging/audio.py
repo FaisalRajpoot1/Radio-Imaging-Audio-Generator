@@ -4,6 +4,7 @@ import lameenc
 import numpy as np
 import pyloudnorm
 import scipy.io.wavfile
+from scipy.ndimage import minimum_filter1d, uniform_filter1d
 
 PEAK_CEILING_DBFS = -1.0
 
@@ -12,18 +13,41 @@ PEAK_CEILING_DBFS = -1.0
 LOUDNESS_TARGETS = {"Broadcast (EBU R128, -23 LUFS)": -23.0, "Online / podcast (-16 LUFS)": -16.0}
 
 
-def normalize_loudness(samples, rate, target_lufs):
-    """Scale a clip to the target loudness (ITU-R BS.1770, measured by pyloudnorm).
+def limit_peaks(samples, rate, ceiling_dbfs=PEAK_CEILING_DBFS, lookahead=0.005, hold=0.05):
+    """Look-ahead peak limiter: no sample above the ceiling, gain changes smooth.
 
-    The gain is capped so the highest sample stays at or below -1 dBFS. A very
-    peaky clip then ends up a little quieter than the target instead of clipping.
+    For each sample, take the lowest gain any sample needs from `hold` seconds
+    back to `lookahead` seconds ahead, then average that over the look-ahead
+    window. Every window that is averaged at a peak contains the peak itself,
+    so the gain there is never above what the peak needs. The gain ramps down
+    over the look-ahead time instead of jumping, which would distort.
     """
-    peak = np.max(np.abs(samples))
-    if peak == 0:
+    ceiling = 10 ** (ceiling_dbfs / 20)
+    needed = np.minimum(1.0, ceiling / np.maximum(np.abs(samples), 1e-12))
+    ahead = max(1, round(lookahead * rate))
+    back = round(hold * rate)
+    # window [n - back, n + ahead - 1]; scipy's origin shifts the window left
+    envelope = minimum_filter1d(needed, size=back + ahead, origin=back - (back + ahead) // 2, mode="nearest")
+    # window [n - ahead + 1, n]
+    gain = uniform_filter1d(envelope, size=ahead, origin=(ahead - 1) - ahead // 2, mode="nearest")
+    # Rounding in the average can overshoot by about 1e-7; keep the promise exactly.
+    return np.clip(samples * gain, -ceiling, ceiling).astype(np.float32)
+
+
+def normalize_loudness(samples, rate, target_lufs):
+    """Bring a clip to the target loudness (ITU-R BS.1770, measured by pyloudnorm).
+
+    No sample goes above -1 dBFS: where peaks leave no headroom, the peak
+    limiter lowers only the peaks. Limiting takes a little loudness away, so
+    gain and limiting repeat a few times to land on the target.
+    """
+    if np.max(np.abs(samples)) == 0:
         return samples
-    loudness = pyloudnorm.Meter(rate).integrated_loudness(samples)
-    gain_db = min(target_lufs - loudness, PEAK_CEILING_DBFS - 20 * np.log10(peak))
-    return (samples * 10 ** (gain_db / 20)).astype(np.float32)
+    meter = pyloudnorm.Meter(rate)
+    out = np.asarray(samples, dtype=np.float32)
+    for _ in range(4):
+        out = limit_peaks(out * 10 ** ((target_lufs - meter.integrated_loudness(out)) / 20), rate)
+    return out
 
 
 def apply_fades(samples, rate, fade_in=0.05, fade_out=1.0):
