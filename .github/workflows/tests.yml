@@ -23,3 +23,21 @@ jobs:
       # The real-model tests are skipped here: they need the 2.4 GB model.
       - name: Run tests
         run: python -m pytest tests -q
+
+  space:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: space/requirements.txt
+
+      # The same versions as the Hugging Face Space; Gradio comes from its sdk_version.
+      - name: Install dependencies
+        run: pip install -r space/requirements.txt gradio==6.28.0 pytest --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Run the Space app and core tests
+        run: python -m pytest tests/test_space_app.py tests/test_core_model.py tests/test_core_audio.py tests/test_core_prompts.py -q
