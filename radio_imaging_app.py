@@ -4,12 +4,8 @@ import streamlit as st
 
 from radio_imaging.audio import LOUDNESS_TARGETS, finish_clip, to_mp3_bytes, to_wav_bytes
 from radio_imaging.model import generate, load_musicgen as load_musicgen_uncached
-from radio_imaging.prompts import (GENRES, GPT_MODELS, INSTRUMENTS, MOODS, ModelUnavailableError,
-                                   build_prompt, improve_with_gpt)
-
-
-# Copyright notice shown to people with every prompt. It is not sent to MusicGen.
-copyright_notice = "\n\n© Created through Radio Imaging Audio Generator by Bilsimaging [WEBSITE](https://bilsimaging.com)"
+from radio_imaging.prompts import (COPYRIGHT_NOTICE as copyright_notice, GENRES, GPT_MODELS, INSTRUMENTS, MOODS,
+                                   ModelUnavailableError, build_prompt, improve_with_gpt)
 
 
 # Load MusicGen once per server process. Every click, from every user, reuses it

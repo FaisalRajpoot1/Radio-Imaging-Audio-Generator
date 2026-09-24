@@ -1,0 +1,7 @@
+torch==2.8.0
+transformers==5.17.0
+scipy==1.18.1
+pyloudnorm==0.2.0
+lameenc==1.8.4
+openai==3.19.2
+spaces==0.51.3

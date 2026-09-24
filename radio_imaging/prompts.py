@@ -4,6 +4,9 @@ import openai
 # down on 13 Sep 2024 and gpt-3.5-turbo shuts down on 23 Oct 2026.
 GPT_MODELS = ["gpt-6-luna", "gpt-6-astra"]
 
+# The original author's credit, shown to people with every prompt. It is not sent to MusicGen.
+COPYRIGHT_NOTICE = "\n\n© Created through Radio Imaging Audio Generator by Bilsimaging [WEBSITE](https://bilsimaging.com)"
+
 # Choices for the free prompt builder.
 GENRES = ["pop", "rock", "electronic", "hip hop", "jazz", "orchestral", "ambient"]
 MOODS = ["upbeat", "energetic", "calm", "dramatic", "warm", "dark"]
